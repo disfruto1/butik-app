@@ -1,4 +1,5 @@
 from decimal import Decimal
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -15,6 +16,14 @@ from auth import sifreyi_hashle, sifreyi_dogrula, token_olustur, tokeni_coz
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Butik App API", version="2.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="giris")
 
 def get_db():
