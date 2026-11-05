@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import func, or_
@@ -20,7 +20,8 @@ from schemas import (
     UrunOlustur, UrunCevap, AktifGuncelle,
     SiparisOlustur, SiparisCevap, SiparisDurumGuncelle,
 )
-from auth import sifreyi_hashle, sifreyi_dogrula, token_olustur, tokeni_coz
+from auth import sifreyi_hashle, giris_sifresini_dogrula, token_olustur, tokeni_coz
+import giris_siniri
 
 models.Base.metadata.create_all(bind=engine)
 kolonlari_tamamla(engine)
@@ -97,11 +98,25 @@ def kullanici_kayit(veri: KullaniciOlustur, db: Session = Depends(get_db)):
 
 
 @app.post("/giris", response_model=Token, tags=["Auth"])
-def kullanici_giris(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def kullanici_giris(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     e_posta = form.username.strip().lower()
+    ip = request.client.host if request.client else "bilinmiyor"
+
+    kalan = giris_siniri.kilit_suresi(db, e_posta, ip)
+    if kalan:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Cok fazla basarisiz deneme. Lutfen daha sonra tekrar deneyin.",
+            headers={"Retry-After": str(kalan)},
+        )
+
     kullanici = db.query(Kullanici).filter(func.lower(Kullanici.e_posta) == e_posta).first()
-    if not kullanici or not kullanici.aktif or not sifreyi_dogrula(form.password, kullanici.sifre_hash):
+    sifre_dogru = giris_sifresini_dogrula(form.password, kullanici.sifre_hash if kullanici else None)
+    if not sifre_dogru or not kullanici.aktif:
+        giris_siniri.basarisiz_giris(db, e_posta, ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-posta veya sifre yanlis")
+
+    giris_siniri.basarili_giris(db, e_posta, ip)
     token = token_olustur({"sub": kullanici.e_posta})
     return {"access_token": token, "token_type": "bearer"}
 

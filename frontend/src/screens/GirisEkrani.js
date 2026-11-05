@@ -4,6 +4,18 @@ import api, { hataMesaji } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { renk } from '../theme';
 
+function girisHataMesaji(error) {
+  const durum = error.response?.status;
+  if (durum === 401) return 'E-posta veya şifre yanlış.';
+  if (durum === 429) {
+    const saniye = Number(error.response.headers?.['retry-after']);
+    const sure = saniye > 0 ? `${Math.ceil(saniye / 60)} dakika sonra` : 'daha sonra';
+    return `Çok fazla başarısız deneme yapıldı. Lütfen ${sure} tekrar deneyin.`;
+  }
+  if (error.response) return 'Giriş yapılamadı. Lütfen biraz sonra tekrar deneyin.';
+  return hataMesaji(error); // sunucuya ulaşılamadı
+}
+
 export default function GirisEkrani({ navigation }) {
   const { girisYap } = useAuth();
   const [email, setEmail] = useState('');
@@ -25,8 +37,7 @@ export default function GirisEkrani({ navigation }) {
       });
       await girisYap(response.data.access_token);
     } catch (error) {
-      const mesaj = error.response ? 'E-posta veya şifre yanlış.' : hataMesaji(error);
-      Alert.alert('Hata', mesaj);
+      Alert.alert('Hata', girisHataMesaji(error));
       setYukleniyor(false);
     }
   };

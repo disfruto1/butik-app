@@ -55,9 +55,10 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 ## Faz 5 — Kalite ve yayına hazırlık
 
 - [ ] Veritabanı değişiklikleri için Alembic migration'ları (şimdilik `backend/migrate.py` eksik kolonları ekliyor)
-- [x] Backend testleri (pytest, 29 test). Frontend testleri henüz yok
+- [x] Backend testleri (pytest, 42 test). Frontend testleri henüz yok
 - [ ] Refresh token veya daha uzun oturum stratejisi
-- [ ] İstek sınırlama (rate limit), giriş denemesi koruması
+- [x] Giriş denemesi koruması: 15 dakikada aynı IP'den aynı hesaba 5, aynı IP'den toplam 30 başarısız deneme (`backend/giris_siniri.py`)
+- [ ] Genel istek sınırlama (kayıt ve diğer uçlar için rate limit)
 - [ ] Şifre sıfırlama (e-posta ile)
 - [ ] Docker ile backend, HTTPS'li sunucuya yayın
 - [x] CI (GitHub Actions): backend testleri çalışıyor (`.github/workflows/ci.yml`). Lint ve frontend kontrolleri henüz yok
@@ -75,7 +76,9 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 
 ## Bilinen riskler
 
-- Eski `SECRET_KEY` repo geçmişinde duruyor. Yeni bir anahtar üretilmeli, eskisiyle imzalanmış tüm tokenlar geçersiz sayılır.
+- Eski `SECRET_KEY` repo geçmişinde duruyor. Yerel `.env`'deki anahtar ondan farklı; yayın sunucusunda da mutlaka yeni bir anahtar üretilmeli.
 - Sepet ve favoriler telefonda saklanır (hesaba bağlı değil), çıkış yapınca silinir. Fiyat ve stok her zaman sunucudan doğrulanır.
 - Ödeme otomatik değil: yönetici havaleyi kontrol edip siparişi elle "Ödendi" yapmalı.
-- Girişte deneme sınırı (rate limit) yok. Yayına çıkmadan eklenmeli (Faz 5).
+- Giriş sınırı IP adresine bakar. Yayında backend bir proxy (Nginx vb.) arkasındaysa `uvicorn --proxy-headers --forwarded-allow-ips=<proxy IP>` ile çalıştırılmalı; yoksa tüm müşteriler aynı IP'den geliyor görünür ve birbirinin sınırını doldurur.
+- Çok sayıda farklı IP'den tek hesaba yapılan denemeleri giriş sınırı durdurmaz. Yayında proxy veya servis sağlayıcı katmanında da koruma düşünülmeli.
+- Şifre sıfırlama henüz yok: e-posta servisi seçimi bekliyor. Şifresini unutan müşteri için şimdilik elle müdahale gerekir.

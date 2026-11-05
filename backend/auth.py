@@ -23,8 +23,16 @@ def sifreyi_hashle(sifre):
     return pwd_context.hash(sifre)
 
 
-def sifreyi_dogrula(duz_sifre, hashed_sifre):
-    return pwd_context.verify(duz_sifre, hashed_sifre)
+# Kullanici bulunamasa da ayni sure harcansin: yanit suresinden kayitli e-postalar anlasilmasin
+_SAHTE_HASH = pwd_context.hash("kullanici-yokken-karsilastirilan-deger")
+
+
+def giris_sifresini_dogrula(duz_sifre, hashed_sifre):
+    """hashed_sifre None ise (kullanici yok) yine hash hesaplar ve False doner."""
+    if len(duz_sifre.encode()) > 72:  # bcrypt en fazla 72 bayt isler, kayitta da bu sinir var
+        return False
+    dogru = pwd_context.verify(duz_sifre, hashed_sifre or _SAHTE_HASH)
+    return dogru and hashed_sifre is not None
 
 
 def token_olustur(data):

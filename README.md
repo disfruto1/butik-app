@@ -47,6 +47,8 @@ pg_dump butik_db > ~/butik_yedek.sql
 **Havale/EFT bilgisi:** `.env` içindeki `ODEME_BILGISI` satırı, müşteriye sipariş sonrası gösterilir.
 Ödeme otomatik doğrulanmaz, yönetici paneli > Siparişler ekranından siparişi elle "Ödendi" yaparsınız.
 
+**Giriş sınırı:** 15 dakikada aynı IP'den aynı hesaba 5, aynı IP'den toplam 30 başarısız denemeden sonra giriş geçici olarak kapanır (`giris_siniri.py`). Backend bir proxy arkasında yayınlanacaksa [ROADMAP.md](ROADMAP.md) içindeki "Bilinen riskler" bölümüne bakın.
+
 **Testler** (gerçek veritabanına dokunmaz, geçici SQLite kullanır):
 
 ```bash

@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -40,6 +40,13 @@ class Kullanici(Base):
     aktif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     olusturulma_tarihi: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     siparisler: Mapped[list["Siparis"]] = relationship(back_populates="kullanici")
+
+class GirisDenemesi(Base):
+    """Basarisiz giris sayaci (bkz. giris_siniri.py)."""
+    __tablename__ = "giris_denemeleri"
+    anahtar: Mapped[str] = mapped_column(String(64), primary_key=True)  # sha256, e-posta/IP duz metin saklanmaz
+    sayi: Mapped[int] = mapped_column(Integer, nullable=False)
+    pencere_basi: Mapped[int] = mapped_column(BigInteger, nullable=False)  # unix zamani (saniye)
 
 class Adres(Base):
     __tablename__ = "adresler"
