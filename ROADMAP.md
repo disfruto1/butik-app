@@ -55,11 +55,11 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 ## Faz 5 — Kalite ve yayına hazırlık
 
 - [ ] Veritabanı değişiklikleri için Alembic migration'ları (şimdilik `backend/migrate.py` eksik kolonları ekliyor)
-- [x] Backend testleri (pytest, 49 test; 6 eşzamanlılık testi yalnızca PostgreSQL'de çalışır, CI'da henüz atlanıyor). Frontend testleri henüz yok
+- [x] Backend testleri (pytest, 73 test; 8 eşzamanlılık testi yalnızca PostgreSQL'de çalışır, CI'da henüz atlanıyor). Frontend testleri henüz yok
 - [ ] Refresh token veya daha uzun oturum stratejisi
 - [x] Giriş denemesi koruması: 15 dakikada aynı IP'den aynı hesaba 5, aynı IP'den toplam 30 başarısız deneme (`backend/giris_siniri.py`)
 - [ ] Genel istek sınırlama (kayıt ve diğer uçlar için rate limit)
-- [ ] Şifre sıfırlama (e-posta ile)
+- [x] Şifre sıfırlama (e-postayla 8 haneli kod, SMTP ile). Yayında çalışması için `SMTP_*` ayarları ve e-posta servisi gerekir
 - [ ] Docker ile backend, HTTPS'li sunucuya yayın
 - [x] CI (GitHub Actions): backend testleri çalışıyor (`.github/workflows/ci.yml`). Lint ve frontend kontrolleri henüz yok
 - [ ] EAS ile Android/iOS build, mağaza hazırlığı
@@ -81,4 +81,4 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 - Ödeme otomatik değil: yönetici havaleyi kontrol edip siparişi elle "Ödendi" yapmalı.
 - Giriş sınırı IP adresine bakar. Yayında backend bir proxy (Nginx vb.) arkasındaysa `uvicorn --proxy-headers --forwarded-allow-ips=<proxy IP>` ile çalıştırılmalı; yoksa tüm müşteriler aynı IP'den geliyor görünür ve birbirinin sınırını doldurur.
 - Çok sayıda farklı IP'den tek hesaba yapılan denemeleri giriş sınırı durdurmaz. Yayında proxy veya servis sağlayıcı katmanında da koruma düşünülmeli.
-- Şifre sıfırlama henüz yok: e-posta servisi seçimi bekliyor. Şifresini unutan müşteri için şimdilik elle müdahale gerekir.
+- Şifre sıfırlama kodu e-posta servisi ayarlanana kadar gitmez: `SMTP_*` ayarları boşsa müşteri kod alamaz, uygulama yine de "gönderildi" der (hesap varlığı sızmasın diye). Yayından önce ayarlanmalı.

@@ -41,4 +41,11 @@ export function hataMesaji(err, varsayilan = 'Bir hata oluştu.') {
   return typeof detay === 'string' ? detay : varsayilan;
 }
 
+// Deneme sınırı (429) yanıtındaki bekleme süresini kullanıcıya yazar
+export function sinirMesaji(err) {
+  const saniye = Number(err.response?.headers?.['retry-after']);
+  const sure = saniye > 0 ? `${Math.ceil(saniye / 60)} dakika sonra` : 'daha sonra';
+  return `Çok fazla deneme yapıldı. Lütfen ${sure} tekrar deneyin.`;
+}
+
 export default api;
