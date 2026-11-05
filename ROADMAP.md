@@ -49,7 +49,7 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 
 - [x] PayTR kart ödemesi backend'i: ödeme başlatma, imzalı bildirim, süre aşımında iptal (`backend/paytr.py`). Gerçek PayTR ile henüz denenmedi
 - [x] Sipariş durumunun ödeme sonucuna göre güncellenmesi (`odeme_bekliyor` → `odendi`)
-- [ ] Uygulamada kart ödeme ekranı (WebView) ve telefon alanı. Şimdilik uygulamada yalnızca **havale/EFT** var: sipariş sonrası `ODEME_BILGISI` gösteriliyor, yönetici ödemeyi elle "Ödendi" yapıyor
+- [x] Uygulamada kart ödeme ekranı (WebView) ve telefon alanı. Android'de sahte PayTR ile denendi; gerçek PayTR ve iOS'ta akış henüz denenmedi. **Havale/EFT** de duruyor: `ODEME_BILGISI` doluysa ödeme ekranında gösterilir, yönetici elle "Ödendi" yapar
 - [ ] Yönetici panelinde ödeme sorunları ekranı (backend: `GET /yonetim/odeme-sorunlari`) ve iadenin PayTR API'siyle yapılması
 - [x] Kargo takip numarası alanı ve müşteriye gösterimi
 - [x] İptal ve iade akışı (stoğun geri eklenmesi)

@@ -15,6 +15,7 @@ import UrunlerEkrani from './src/screens/UrunlerEkrani';
 import UrunDetayEkrani from './src/screens/UrunDetayEkrani';
 import FavorilerEkrani from './src/screens/FavorilerEkrani';
 import SepetEkrani from './src/screens/SepetEkrani';
+import OdemeEkrani from './src/screens/OdemeEkrani';
 import SiparislerimEkrani from './src/screens/SiparislerimEkrani';
 import AdreslerEkrani from './src/screens/AdreslerEkrani';
 import AdresFormEkrani from './src/screens/AdresFormEkrani';
@@ -47,6 +48,7 @@ function UygulamaAkisi() {
       <AppStack.Screen name="UrunDetay" component={UrunDetayEkrani} options={{ title: 'Ürün' }} />
       <AppStack.Screen name="Favoriler" component={FavorilerEkrani} options={{ title: 'Favorilerim' }} />
       <AppStack.Screen name="Sepet" component={SepetEkrani} options={{ title: 'Sepetim' }} />
+      <AppStack.Screen name="Odeme" component={OdemeEkrani} options={{ title: 'Ödeme' }} />
       <AppStack.Screen name="Siparislerim" component={SiparislerimEkrani} options={{ title: 'Siparişlerim' }} />
       <AppStack.Screen name="Adresler" component={AdreslerEkrani} options={{ title: 'Adreslerim' }} />
       <AppStack.Screen name="AdresForm" component={AdresFormEkrani} options={{ title: 'Adres' }} />
