@@ -51,7 +51,7 @@ export default function SepetEkrani({ navigation }) {
     }
     setYukleniyor(true);
     try {
-      await api.post('/siparisler', {
+      const { data: siparis } = await api.post('/siparisler', {
         kargo_adres: kargoAdres,
         kalemler: kalemler.map((k) => ({ urun_id: k.urun.id, adet: k.adet })),
       });
@@ -65,11 +65,17 @@ export default function SepetEkrani({ navigation }) {
         }
       }
       let odemeBilgisi = '';
+      let kartOdeme = false;
       try {
         const ayar = await api.get('/ayarlar');
         odemeBilgisi = ayar.data.odeme_bilgisi || '';
+        kartOdeme = !!ayar.data.kart_odeme;
       } catch (e) {
         // ödeme bilgisi alınamazsa sipariş yine de alınmıştır
+      }
+      if (kartOdeme) {
+        navigation.replace('Odeme', { siparisId: siparis.id, tutar: siparis.toplam_tutar, odemeBilgisi });
+        return;
       }
       Alert.alert(
         'Siparişiniz alındı',

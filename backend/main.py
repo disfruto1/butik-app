@@ -1,10 +1,16 @@
+import asyncio
+import ipaddress
+import logging
 import os
+import time
+from contextlib import asynccontextmanager
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, Depends, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -12,8 +18,9 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models
 from migrate import kolonlari_tamamla
-from models import Adres, Kullanici, KullaniciRol, Urun, Kategori, Siparis, SiparisKalemi, SiparisDurum
+from models import Adres, Kullanici, KullaniciRol, PaytrDurum, PaytrOdeme, Urun, Kategori, Siparis, SiparisKalemi, SiparisDurum
 from schemas import (
+    OdemeBaslat, OdemeBaslatCevap, OdemeDurumCevap, OdemeSorunuCevap,
     AdresOlustur, AdresCevap,
     SifirlamaIstek, SifirlamaTamamla,
     KullaniciOlustur, KullaniciCevap, Token,
@@ -24,12 +31,39 @@ from schemas import (
 from auth import sifreyi_hashle, giris_sifresini_dogrula, token_olustur, tokeni_coz
 import eposta
 import giris_siniri
+import paytr
 import sifre_sifirlama
 
 models.Base.metadata.create_all(bind=engine)
 kolonlari_tamamla(engine)
 
-app = FastAPI(title="Butik App API", version="3.0.0")
+log = logging.getLogger("butik.odeme")
+
+TEMIZLIK_ARALIGI_SANIYE = 5 * 60
+# PayTR odeme sayfasinin suresi + gec gelen bildirimler icin pay
+ODEME_ZAMAN_ASIMI_SANIYE = (paytr.ODEME_SURESI_DAKIKA + 15) * 60
+
+
+async def _odeme_temizleyici():
+    while True:
+        await asyncio.sleep(TEMIZLIK_ARALIGI_SANIYE)
+        try:
+            await asyncio.to_thread(_odeme_temizligi_calistir)
+        except Exception:
+            log.exception("Suresi dolan odemeler temizlenemedi")
+
+
+@asynccontextmanager
+async def _yasam_dongusu(_: FastAPI):
+    ayar = paytr.ayarlar()
+    if ayar and ayar.test_modu:
+        log.warning("PayTR TEST MODUNDA: odemeler gercek para almaz ama siparisler 'odendi' olur")
+    gorev = asyncio.create_task(_odeme_temizleyici())
+    yield
+    gorev.cancel()
+
+
+app = FastAPI(title="Butik App API", version="3.0.0", lifespan=_yasam_dongusu)
 
 # Izinli adresler .env'de virgulle ayrilarak verilir. Bos ise yerel gelistirme adresleri kullanilir.
 # Mobil uygulama (React Native) tarayici kullanmadigi icin CORS'tan etkilenmez; sadece web icin gerekir.
@@ -82,7 +116,7 @@ def ana_sayfa():
 @app.get("/ayarlar", tags=["Genel"])
 def ayarlar():
     """Uygulamanin gosterecegi genel bilgiler (ornegin havale/EFT odeme bilgisi)."""
-    return {"odeme_bilgisi": os.getenv("ODEME_BILGISI", "")}
+    return {"odeme_bilgisi": os.getenv("ODEME_BILGISI", ""), "kart_odeme": paytr.ayarlar() is not None}
 
 
 # ----------------------------------------------------------------- Auth
@@ -496,6 +530,239 @@ def siparis_durum_guncelle(siparis_id: int, veri: SiparisDurumGuncelle, db: Sess
     db.commit()
     db.refresh(siparis)
     return siparis
+
+
+# ----------------------------------------------------------------- Kart odemesi (PayTR)
+
+def _odeme_ip(request: Request, ayar: paytr.Ayarlar) -> str:
+    """PayTR musterinin dis IP'sini ister. Yerel denemede istemci IP'si dahili oldugu icin ayardan alinir."""
+    ip = request.client.host if request.client else ""
+    try:
+        if ipaddress.ip_address(ip).is_private and ayar.yerel_ip:
+            return ayar.yerel_ip
+    except ValueError:
+        pass
+    return ip
+
+
+@app.post("/siparisler/{siparis_id}/odeme/paytr", response_model=OdemeBaslatCevap, tags=["Odeme"])
+def paytr_odeme_baslat(
+    siparis_id: int,
+    veri: OdemeBaslat,
+    request: Request,
+    db: Session = Depends(get_db),
+    kullanici: Kullanici = Depends(aktif_kullanici_getir),
+):
+    ayar = paytr.ayarlar()
+    if ayar is None:
+        raise HTTPException(status_code=503, detail="Kart ile odeme su an kullanilamiyor")
+    kalan = giris_siniri.odeme_baslatma_say(db, kullanici.id)
+    if kalan:
+        raise _cok_fazla_istek(kalan)
+
+    # Durum kontrolu ve deneme kaydi kilit altinda; PayTR istegi kilit birakildiktan sonra.
+    # Kilit acik kalsaydi yavas bir PayTR yaniti iptal ve bildirimleri de bekletirdi.
+    siparis = db.query(Siparis).filter(Siparis.id == siparis_id).with_for_update().first()
+    if not siparis or siparis.kullanici_id != kullanici.id:
+        raise HTTPException(status_code=404, detail="Siparis bulunamadi")
+    if siparis.durum != SiparisDurum.ODEME_BEKLIYOR:
+        raise HTTPException(status_code=400, detail="Bu siparis icin odeme beklenmiyor")
+    # Tutar sadece sunucudaki siparisten gelir, istemciden alinmaz
+    tutar_kurus = paytr.kurusa_cevir(siparis.toplam_tutar)
+    if tutar_kurus <= 0:
+        raise HTTPException(status_code=400, detail="Bu siparis icin odeme alinamaz")
+    telefon = veri.telefon.strip() if veri.telefon else kullanici.telefon
+    if not telefon:
+        raise HTTPException(status_code=400, detail="Kart ile odeme icin telefon numarasi gerekli")
+    e_posta = kullanici.e_posta
+    if not e_posta.isascii() or len(e_posta) > 100:
+        raise HTTPException(status_code=400, detail="E-posta adresiniz kart odemesi icin uygun degil")
+
+    merchant_oid = paytr.siparis_no_uret(siparis.id)
+    sepet = paytr.sepet_kodla([(k.urun_adi, k.birim_fiyat, k.adet) for k in siparis.kalemler])
+    ad, adres = kullanici.ad, siparis.kargo_adres or "Belirtilmedi"
+    kullanici.telefon = telefon
+    db.add(PaytrOdeme(merchant_oid=merchant_oid, siparis_id=siparis.id, tutar_kurus=tutar_kurus, test_modu=ayar.test_modu, olusturulma=int(time.time())))
+    db.commit()
+
+    try:
+        token = paytr.token_iste(
+            ayar,
+            merchant_oid=merchant_oid,
+            ip=_odeme_ip(request, ayar),
+            e_posta=e_posta,
+            tutar_kurus=tutar_kurus,
+            sepet=sepet,
+            ad=ad,
+            adres=adres,
+            telefon=telefon,
+        )
+    except paytr.PaytrHatasi as hata:
+        log.error("Odeme baslatilamadi (%s): %s", merchant_oid, hata)
+        db.query(PaytrOdeme).filter(PaytrOdeme.merchant_oid == merchant_oid, PaytrOdeme.durum == PaytrDurum.BEKLIYOR).update(
+            {PaytrOdeme.durum: PaytrDurum.TOKEN_ALINAMADI}
+        )
+        db.commit()
+        raise HTTPException(status_code=502, detail="Odeme baslatilamadi. Lutfen tekrar deneyin.") from hata
+    return OdemeBaslatCevap(merchant_oid=merchant_oid, odeme_url=paytr.ODEME_SAYFASI + token, test_modu=ayar.test_modu)
+
+
+async def _form_oku(request: Request):
+    return await request.form()
+
+
+def _bildirim_red(sebep: str, kod: int) -> PlainTextResponse:
+    # "OK" donmedigimiz surece PayTR bildirimi teslim edilmemis sayar
+    return PlainTextResponse(sebep, status_code=kod)
+
+
+@app.post("/odeme/paytr/bildirim", response_class=PlainTextResponse, tags=["Odeme"])
+def paytr_bildirim(form=Depends(_form_oku), db: Session = Depends(get_db)):
+    """PayTR'in sunucudan sunucuya odeme sonucu bildirimi. Giris istemez, guven imzadan gelir."""
+    ayar = paytr.ayarlar()
+    if ayar is None:
+        return _bildirim_red("yapilandirilmamis", 503)
+    merchant_oid, durum, toplam, imza = (str(form.get(a, "")) for a in ("merchant_oid", "status", "total_amount", "hash"))
+    if not (merchant_oid and imza) or not paytr.bildirim_gecerli(ayar, merchant_oid, durum, toplam, imza):
+        log.warning("PayTR bildiriminde gecersiz imza")
+        return _bildirim_red("gecersiz imza", 400)
+    if durum not in ("success", "failed") or not toplam.isdigit():
+        return _bildirim_red("gecersiz icerik", 400)
+
+    kayit = db.query(PaytrOdeme.siparis_id).filter(PaytrOdeme.merchant_oid == merchant_oid).first()
+    if not kayit:
+        # Bizim degil. OK donulmez: baska bir sistemin bildirimiyse kaybolmasin, PayTR panelinde gorunsun
+        log.error("Bilinmeyen PayTR bildirimi: %s", merchant_oid)
+        return _bildirim_red("bilinmeyen siparis", 404)
+
+    # Kilit sirasi her yerde once siparis: iptal ve ayni anda gelen tekrar bildirimlerle yarismaz
+    siparis = db.query(Siparis).filter(Siparis.id == kayit.siparis_id).with_for_update().first()
+    odeme = db.query(PaytrOdeme).filter(PaytrOdeme.merchant_oid == merchant_oid).with_for_update().first()
+    if odeme.durum in (PaytrDurum.BASARILI, PaytrDurum.BASARISIZ):
+        db.rollback()
+        return PlainTextResponse("OK")  # tekrar gelen bildirim, ilki islendi
+
+    if durum == "failed":
+        odeme.durum = PaytrDurum.BASARISIZ
+        odeme.hata_kodu = str(form.get("failed_reason_code", ""))[:20] or None
+        odeme.hata_mesaji = str(form.get("failed_reason_msg", ""))[:255] or None
+    else:
+        odeme.durum = PaytrDurum.BASARILI
+        odeme.odenen_kurus = int(toplam)
+        odeme.inceleme_nedeni = _odeme_sorunu(odeme, siparis, form)
+        if odeme.inceleme_nedeni:
+            log.error("PayTR odemesi incelenmeli (%s): %s", merchant_oid, odeme.inceleme_nedeni)
+        else:
+            siparis.durum = SiparisDurum.ODENDI
+    db.commit()
+    return PlainTextResponse("OK")
+
+
+def _odeme_sorunu(odeme: PaytrOdeme, siparis: Siparis, form) -> Optional[str]:
+    """Basarili bildirim siparisi "odendi" yapmaya yetmiyorsa nedenini dondurur."""
+    if str(form.get("test_mode", "")) == "1" and not odeme.test_modu:
+        return "test_bildirimi"
+    if odeme.odenen_kurus < odeme.tutar_kurus or str(form.get("currency", paytr.PARA_BIRIMI)) not in (paytr.PARA_BIRIMI, "TRY"):
+        return "tutar_uyusmazligi"
+    if siparis.durum == SiparisDurum.IPTAL_EDILDI:
+        return "iptal_siparise_odeme"  # musteri veya zaman asimi iptal etmis, para iade edilmeli
+    if siparis.durum != SiparisDurum.ODEME_BEKLIYOR:
+        return "zaten_odenmis_siparis"  # ikinci deneme de odendi veya havale elle onaylandi
+    return None
+
+
+def _odeme_sonuc_sayfasi(baslik: str, metin: str) -> HTMLResponse:
+    return HTMLResponse(
+        '<!doctype html><html lang="tr"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+        f'<body style="font-family:sans-serif;text-align:center;padding:48px 16px"><h2>{baslik}</h2><p>{metin}</p></body></html>'
+    )
+
+
+# Bu sayfalar sadece musteriye bilgi verir, odemeyi onaylamaz. Onay yalnizca bildirimden gelir.
+@app.get("/odeme/paytr/tamam", response_class=HTMLResponse, include_in_schema=False)
+def paytr_tamam_sayfasi():
+    return _odeme_sonuc_sayfasi("Ödemeniz alınıyor", "Uygulamaya dönebilirsiniz.")
+
+
+@app.get("/odeme/paytr/hata", response_class=HTMLResponse, include_in_schema=False)
+def paytr_hata_sayfasi():
+    return _odeme_sonuc_sayfasi("Ödeme tamamlanamadı", "Uygulamaya dönüp tekrar deneyebilirsiniz.")
+
+
+@app.get("/odeme/paytr/{merchant_oid}", response_model=OdemeDurumCevap, tags=["Odeme"])
+def paytr_odeme_durumu(merchant_oid: str, db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    odeme = db.query(PaytrOdeme).filter(PaytrOdeme.merchant_oid == merchant_oid).first()
+    siparis = db.query(Siparis).filter(Siparis.id == odeme.siparis_id).first() if odeme else None
+    if not siparis or (kullanici.rol != KullaniciRol.YONETICI and siparis.kullanici_id != kullanici.id):
+        raise HTTPException(status_code=404, detail="Odeme bulunamadi")
+    return OdemeDurumCevap(
+        merchant_oid=odeme.merchant_oid,
+        durum=odeme.durum,
+        siparis_id=siparis.id,
+        siparis_durum=siparis.durum,
+        hata_mesaji=odeme.hata_mesaji,
+    )
+
+
+@app.get("/yonetim/odeme-sorunlari", response_model=list[OdemeSorunuCevap], tags=["Yonetim"])
+def odeme_sorunlari(db: Session = Depends(get_db), _: Kullanici = Depends(yonetici_gerektir)):
+    """Para alinmis ama siparisi "odendi" yapilamamis denemeler. Iade veya elle kontrol gerekir."""
+    return (
+        db.query(PaytrOdeme)
+        .filter(PaytrOdeme.inceleme_nedeni.is_not(None))
+        .order_by(PaytrOdeme.olusturulma.desc())
+        .limit(200)
+        .all()
+    )
+
+
+def _suresi_dolanlar(db: Session, sinir: int):
+    """Kart denenmis, son denemesi eskimis ve hic para alinmamis, hala odeme bekleyen siparisler.
+
+    Hic kart denenmemis siparisler secilmez: havale gunler surebilir, otomatik iptal edilmemeli.
+    """
+    son_deneme = (
+        db.query(PaytrOdeme.siparis_id)
+        .filter(PaytrOdeme.durum != PaytrDurum.TOKEN_ALINAMADI)
+        .group_by(PaytrOdeme.siparis_id)
+        .having(func.max(PaytrOdeme.olusturulma) <= sinir)
+    )
+    para_alinan = db.query(PaytrOdeme.siparis_id).filter(PaytrOdeme.durum == PaytrDurum.BASARILI)
+    return db.query(Siparis).filter(
+        Siparis.durum == SiparisDurum.ODEME_BEKLIYOR,
+        Siparis.id.in_(son_deneme),
+        Siparis.id.not_in(para_alinan),
+    )
+
+
+def suresi_dolan_odemeleri_iptal_et(db: Session) -> int:
+    """Terk edilen kart odemelerinin siparisini iptal eder, stok geri doner."""
+    sinir = int(time.time()) - ODEME_ZAMAN_ASIMI_SANIYE
+    adaylar = [s.id for s in _suresi_dolanlar(db, sinir).order_by(Siparis.id).limit(50).all()]
+    db.rollback()
+    iptal = 0
+    for siparis_id in adaylar:
+        # Kilit alindiktan sonra kosul tekrar sorgulanir: bu arada odenmis veya yeni deneme baslamis olabilir
+        siparis = _suresi_dolanlar(db, sinir).filter(Siparis.id == siparis_id).with_for_update(skip_locked=True).first()
+        if siparis is None:
+            db.rollback()
+            continue
+        siparis.durum = SiparisDurum.IPTAL_EDILDI
+        _stok_iade_et(db, siparis)
+        db.commit()
+        iptal += 1
+    if iptal:
+        log.info("Suresi dolan %d odeme iptal edildi", iptal)
+    return iptal
+
+
+def _odeme_temizligi_calistir():
+    db = SessionLocal()
+    try:
+        suresi_dolan_odemeleri_iptal_et(db)
+    finally:
+        db.close()
 
 
 # ----------------------------------------------------------------- Yonetim

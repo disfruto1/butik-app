@@ -40,6 +40,7 @@ class Kullanici(Base):
     aktif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # Sifre degisince artar; eski surumle imzalanmis oturumlar gecersiz olur
     token_surumu: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    telefon: Mapped[str | None] = mapped_column(String(20), nullable=True)  # PayTR kart odemesi icin zorunlu ister
     olusturulma_tarihi: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     siparisler: Mapped[list["Siparis"]] = relationship(back_populates="kullanici")
 
@@ -110,3 +111,24 @@ class SiparisKalemi(Base):
     birim_fiyat: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     adet: Mapped[int] = mapped_column(Integer, nullable=False)
     siparis: Mapped[Siparis] = relationship(back_populates="kalemler")
+
+class PaytrDurum:
+    BEKLIYOR = "bekliyor"
+    TOKEN_ALINAMADI = "token_alinamadi"  # musteri odeme sayfasini hic gormedi
+    BASARILI = "basarili"
+    BASARISIZ = "basarisiz"
+
+class PaytrOdeme(Base):
+    """Bir siparis icin yapilan her kart odemesi denemesi. PayTR her denemede yeni numara ister."""
+    __tablename__ = "paytr_odemeleri"
+    merchant_oid: Mapped[str] = mapped_column(String(64), primary_key=True)
+    siparis_id: Mapped[int] = mapped_column(ForeignKey("siparisler.id"), index=True, nullable=False)
+    durum: Mapped[str] = mapped_column(String(20), default=PaytrDurum.BEKLIYOR, nullable=False)
+    tutar_kurus: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    odenen_kurus: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # vade farkiyla tutardan yuksek olabilir
+    test_modu: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    hata_kodu: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    hata_mesaji: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Dolu ise para alinmis ama siparis "odendi" yapilamamistir, yonetici bakmali
+    inceleme_nedeni: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    olusturulma: Mapped[int] = mapped_column(BigInteger, nullable=False)  # unix zamani (saniye)

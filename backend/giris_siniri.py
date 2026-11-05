@@ -29,6 +29,7 @@ IP_SINIRI = 30
 SIFIRLAMA_EPOSTA_SINIRI = 3
 SIFIRLAMA_IP_SINIRI = 10
 SIFIRLAMA_DENEME_IP_SINIRI = 30
+ODEME_BASLATMA_SINIRI = 10
 _TEKRAR = 3  # ayni anda acilan ilk kayit carpismasi icin deneme sayisi
 
 
@@ -109,6 +110,11 @@ def sifirlama_istegi_say(db: Session, e_posta: str, ip: str) -> int:
 def sifirlama_denemesi_say(db: Session, ip: str) -> int:
     """Kod girme denemelerini IP'ye gore sayar: ayni IP'den cok sayida hesaba kod denenemesin."""
     return _say(db, [(_anahtar("sifirlama-deneme-ip", ip), SIFIRLAMA_DENEME_IP_SINIRI)])
+
+
+def odeme_baslatma_say(db: Session, kullanici_id: int) -> int:
+    """Odeme baslatmalarini kullaniciya gore sayar: her biri PayTR'a istek atar."""
+    return _say(db, [(_anahtar("odeme-baslatma", str(kullanici_id)), ODEME_BASLATMA_SINIRI)])
 
 
 def hesap_sayacini_sifirla(db: Session, e_posta: str, ip: str) -> None:

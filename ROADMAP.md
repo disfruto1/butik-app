@@ -47,15 +47,17 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 
 ## Faz 4 — Ödeme ve kargo
 
-- [ ] Kart ile ödeme: sağlayıcı seçimi (Türkiye için iyzico veya PayTR) ve entegrasyonu. Şimdilik **havale/EFT**: sipariş sonrası `ODEME_BILGISI` gösteriliyor, yönetici ödemeyi elle "Ödendi" yapıyor
-- [ ] Sipariş durumunun ödeme sonucuna göre güncellenmesi (`odeme_bekliyor` → `odendi`)
+- [x] PayTR kart ödemesi backend'i: ödeme başlatma, imzalı bildirim, süre aşımında iptal (`backend/paytr.py`). Gerçek PayTR ile henüz denenmedi
+- [x] Sipariş durumunun ödeme sonucuna göre güncellenmesi (`odeme_bekliyor` → `odendi`)
+- [x] Uygulamada kart ödeme ekranı (WebView) ve telefon alanı. Android'de sahte PayTR ile denendi; gerçek PayTR ve iOS'ta akış henüz denenmedi. **Havale/EFT** de duruyor: `ODEME_BILGISI` doluysa ödeme ekranında gösterilir, yönetici elle "Ödendi" yapar
+- [ ] Yönetici panelinde ödeme sorunları ekranı (backend: `GET /yonetim/odeme-sorunlari`) ve iadenin PayTR API'siyle yapılması
 - [x] Kargo takip numarası alanı ve müşteriye gösterimi
 - [x] İptal ve iade akışı (stoğun geri eklenmesi)
 
 ## Faz 5 — Kalite ve yayına hazırlık
 
 - [ ] Veritabanı değişiklikleri için Alembic migration'ları (şimdilik `backend/migrate.py` eksik kolonları ekliyor)
-- [x] Backend testleri (pytest, 73 test; 8 eşzamanlılık testi yalnızca PostgreSQL'de çalışır, CI'da henüz atlanıyor). Frontend testleri henüz yok
+- [x] Backend testleri (pytest, 112 test; 11 eşzamanlılık testi yalnızca PostgreSQL'de çalışır, CI'da henüz atlanıyor). Frontend testleri henüz yok
 - [ ] Refresh token veya daha uzun oturum stratejisi
 - [x] Giriş denemesi koruması: 15 dakikada aynı IP'den aynı hesaba 5, aynı IP'den toplam 30 başarısız deneme (`backend/giris_siniri.py`)
 - [ ] Genel istek sınırlama (kayıt ve diğer uçlar için rate limit)
@@ -81,4 +83,8 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 - Ödeme otomatik değil: yönetici havaleyi kontrol edip siparişi elle "Ödendi" yapmalı.
 - Giriş sınırı IP adresine bakar. Yayında backend bir proxy (Nginx vb.) arkasındaysa `uvicorn --proxy-headers --forwarded-allow-ips=<proxy IP>` ile çalıştırılmalı; yoksa tüm müşteriler aynı IP'den geliyor görünür ve birbirinin sınırını doldurur.
 - Çok sayıda farklı IP'den tek hesaba yapılan denemeleri giriş sınırı durdurmaz. Yayında proxy veya servis sağlayıcı katmanında da koruma düşünülmeli.
+- PayTR mağazası web sitesiyle paylaşılıyor. Paneldeki Bildirim URL'si değiştirilirse web sitesinin siparişleri onaylanmayabilir. Aynı mağazada ikinci adres tanımlanıp tanımlanamayacağı PayTR'a sorulmalı. Uygulama siparişleri `BUTIK` önekiyle başlar, böylece bildirimler ayırt edilebilir.
+- `PAYTR_TEST_MODU=1` iken para alınmaz ama sipariş "Ödendi" olur. Yayında 0 olmalı, yoksa ürün parası alınmadan kargolanabilir.
+- Kart denenip vazgeçilen sipariş 45 dakika sonra iptal olur. Müşteri aynı siparişi sonradan havaleyle ödemek isterse yeni sipariş vermelidir.
+- Yönetici "Ödendi" siparişi iptal ederse kart ücreti otomatik iade edilmez, PayTR panelinden iade gerekir.
 - Şifre sıfırlama kodu e-posta servisi ayarlanana kadar gitmez: `SMTP_*` ayarları boşsa müşteri kod alamaz, uygulama yine de "gönderildi" der (hesap varlığı sızmasın diye). Yayından önce ayarlanmalı.

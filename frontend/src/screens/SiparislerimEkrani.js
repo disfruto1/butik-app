@@ -5,7 +5,8 @@ import api, { hataMesaji } from '../services/api';
 import SiparisKarti from '../components/SiparisKarti';
 import { renk } from '../theme';
 
-export default function SiparislerimEkrani() {
+export default function SiparislerimEkrani({ navigation }) {
+  const [ayarlar, setAyarlar] = useState({ kart_odeme: false, odeme_bilgisi: '' });
   const [siparisler, setSiparisler] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [yenileniyor, setYenileniyor] = useState(false);
@@ -18,6 +19,12 @@ export default function SiparislerimEkrani() {
       setHata(null);
     } catch (err) {
       setHata(hataMesaji(err, 'Siparişler yüklenemedi.'));
+    }
+    try {
+      const res = await api.get('/ayarlar');
+      setAyarlar(res.data);
+    } catch (err) {
+      // Ayar alınamazsa "Kartla öde" düğmesi görünmez, liste yine çalışır
     }
   }, []);
 
@@ -82,6 +89,20 @@ export default function SiparislerimEkrani() {
       ListEmptyComponent={<Text style={styles.bos}>Henüz siparişiniz yok.</Text>}
       renderItem={({ item }) => (
         <SiparisKarti siparis={item}>
+          {item.durum === 'odeme_bekliyor' && ayarlar.kart_odeme ? (
+            <TouchableOpacity
+              style={styles.ode}
+              onPress={() =>
+                navigation.navigate('Odeme', {
+                  siparisId: item.id,
+                  tutar: item.toplam_tutar,
+                  odemeBilgisi: ayarlar.odeme_bilgisi || '',
+                })
+              }
+            >
+              <Text style={styles.odeYazi}>Kartla öde</Text>
+            </TouchableOpacity>
+          ) : null}
           {item.durum === 'odeme_bekliyor' ? (
             <TouchableOpacity style={styles.iptal} onPress={() => iptalEt(item)}>
               <Text style={styles.iptalYazi}>Siparişi iptal et</Text>
@@ -101,6 +122,8 @@ const styles = StyleSheet.create({
   tekrar: { backgroundColor: renk.birincil, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
   tekrarYazi: { color: '#fff', fontWeight: 'bold' },
   bos: { textAlign: 'center', color: renk.yaziSoluk, marginTop: 40 },
+  ode: { marginTop: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: renk.birincil, alignItems: 'center' },
+  odeYazi: { color: '#fff', fontWeight: 'bold' },
   iptal: { marginTop: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: renk.tehlike, alignItems: 'center' },
   iptalYazi: { color: renk.tehlike, fontWeight: 'bold' },
 });

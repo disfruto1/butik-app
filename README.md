@@ -51,6 +51,8 @@ pg_dump butik_db > ~/butik_yedek.sql
 
 **Şifre sıfırlama:** kullanıcı "Şifremi unuttum" ile e-postasına 8 haneli kod alır (15 dakika geçerli, 5 yanlış denemede iptal). Şifre değişince o hesabın eski oturumları kapanır. E-posta göndermek için `.env` içindeki `SMTP_*` satırlarını doldurun. Doldurulmazsa kod gitmez; geliştirmede `EPOSTA_KONSOLA_YAZ=1` ile kodu sunucu çıktısında görebilirsiniz (yayında açmayın).
 
+**Kart ödemesi (PayTR):** `.env` içindeki `PAYTR_*` satırları boşsa kart ödemesi kapalıdır ve uygulama yalnızca havale bilgisini gösterir. Doluysa sipariş sonrası ödeme ekranı açılır, PayTR sayfası uygulama içinde (WebView) gösterilir. Sipariş yalnızca PayTR'ın imzalı bildirimiyle "Ödendi" olur (`POST /odeme/paytr/bildirim`). Bu adres PayTR panelindeki Bildirim URL'si olmalıdır; panel aynı mağazayı kullanan başka bir siteye bağlıysa **değiştirmeden önce** [ROADMAP.md](ROADMAP.md) içindeki "Bilinen riskler" bölümüne bakın. Son denemesinin üzerinden 45 dakika geçen ve para alınmamış kart siparişleri otomatik iptal olur, stok geri döner. Hiç kart denenmemiş siparişlere (havale) dokunulmaz. Para alınıp siparişe işlenemeyen ödemeler `GET /yonetim/odeme-sorunlari` ile listelenir; iade PayTR panelinden elle yapılır.
+
 **Testler** (gerçek veritabanına dokunmaz, geçici SQLite kullanır):
 
 ```bash
