@@ -31,6 +31,7 @@ class KullaniciCevap(BaseModel):
     e_posta: str
     rol: str
     aktif: bool
+    telefon: Optional[str] = None
     olusturulma_tarihi: datetime
 
     class Config:
@@ -135,3 +136,34 @@ class SiparisCevap(BaseModel):
 class SiparisDurumGuncelle(BaseModel):
     durum: Literal["odendi", "kargoya_verildi", "teslim_edildi", "iptal_edildi"]
     takip_no: Optional[str] = Field(default=None, max_length=100)
+
+
+class OdemeBaslat(BaseModel):
+    # Bos ise kullanicinin kayitli telefonu kullanilir
+    telefon: Optional[str] = Field(default=None, pattern=r"^\+?[0-9][0-9 ()-]{9,19}$")
+
+
+class OdemeBaslatCevap(BaseModel):
+    merchant_oid: str
+    odeme_url: str
+    test_modu: bool
+
+
+class OdemeDurumCevap(BaseModel):
+    merchant_oid: str
+    durum: str
+    siparis_id: int
+    siparis_durum: str
+    hata_mesaji: Optional[str] = None
+
+
+class OdemeSorunuCevap(BaseModel):
+    merchant_oid: str
+    siparis_id: int
+    inceleme_nedeni: str
+    tutar_kurus: int
+    odenen_kurus: Optional[int] = None
+    test_modu: bool
+
+    class Config:
+        from_attributes = True
