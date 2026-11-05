@@ -1,11 +1,24 @@
-"""Testler gercek PostgreSQL'e dokunmaz: gecici bir SQLite dosyasi kullanir."""
+"""Testler gercek veritabanina dokunmaz: varsayilan olarak gecici bir SQLite dosyasi kullanir.
+
+PostgreSQL'de calistirmak icin (ayri bir deneme veritabani acip):
+    TEST_DATABASE_URL=postgresql+psycopg2:///butik_test python -m pytest -q
+Testler her seferinde TUM TABLOLARI SILER, bu yuzden adinda "test" gecmeyen veritabani reddedilir.
+"""
 import os
 import sys
 import tempfile
 from pathlib import Path
 
-_gecici = Path(tempfile.mkdtemp()) / "test_butik.db"
-os.environ["DATABASE_URL"] = f"sqlite:///{_gecici}"
+from sqlalchemy.engine import make_url
+
+_test_url = os.environ.get("TEST_DATABASE_URL")
+if _test_url:
+    if "test" not in (make_url(_test_url).database or "").lower():
+        raise RuntimeError('TEST_DATABASE_URL reddedildi: testler tablolari siler, veritabani adinda "test" gecmeli.')
+    os.environ["DATABASE_URL"] = _test_url
+else:
+    _gecici = Path(tempfile.mkdtemp()) / "test_butik.db"
+    os.environ["DATABASE_URL"] = f"sqlite:///{_gecici}"
 os.environ["SECRET_KEY"] = "test-icin-uretilmis-uzun-bir-anahtar-0123456789"
 os.environ.pop("ALLOWED_ORIGINS", None)
 

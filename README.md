@@ -56,6 +56,13 @@ pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
+Eşzamanlılık testleri satır kilidi gerektirdiği için SQLite'ta atlanır. Hepsini PostgreSQL'de çalıştırmak için ayrı bir deneme veritabanı açın. Testler tabloları sildiği için adında "test" geçmeyen veritabanı reddedilir:
+
+```bash
+createdb butik_test
+TEST_DATABASE_URL=postgresql+psycopg2:///butik_test python -m pytest -q
+```
+
 ## Yönetici paneli
 
 Yönetici hesabıyla girince ürün listesinde **Yönetim** bağlantısı görünür: bugünkü sipariş ve ciro özeti,

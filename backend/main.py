@@ -102,7 +102,7 @@ def kullanici_giris(request: Request, form: OAuth2PasswordRequestForm = Depends(
     e_posta = form.username.strip().lower()
     ip = request.client.host if request.client else "bilinmiyor"
 
-    kalan = giris_siniri.kilit_suresi(db, e_posta, ip)
+    kalan = giris_siniri.deneme_baslat(db, e_posta, ip)
     if kalan:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -113,7 +113,6 @@ def kullanici_giris(request: Request, form: OAuth2PasswordRequestForm = Depends(
     kullanici = db.query(Kullanici).filter(func.lower(Kullanici.e_posta) == e_posta).first()
     sifre_dogru = giris_sifresini_dogrula(form.password, kullanici.sifre_hash if kullanici else None)
     if not sifre_dogru or not kullanici.aktif:
-        giris_siniri.basarisiz_giris(db, e_posta, ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-posta veya sifre yanlis")
 
     giris_siniri.basarili_giris(db, e_posta, ip)
@@ -130,6 +129,12 @@ def benim_bilgilerim(kullanici: Kullanici = Depends(aktif_kullanici_getir)):
 # Siparis adresin metnini kopyalar, bu yuzden adres silinse de eski siparisler etkilenmez.
 
 ADRES_SINIRI = 20
+
+
+def _adresleri_kilitle(db: Session, kullanici: Kullanici) -> None:
+    """Ayni kullanicinin adres degisikliklerini sira ile yaptirir: ayni anda gelen istekler
+    birden fazla varsayilan adres olusturamaz, adres sinirini asamaz."""
+    db.query(Kullanici.id).filter(Kullanici.id == kullanici.id).with_for_update().first()
 
 
 def _kendi_adresi(db: Session, adres_id: int, kullanici: Kullanici) -> Adres:
@@ -153,6 +158,7 @@ def adresleri_listele(db: Session = Depends(get_db), kullanici: Kullanici = Depe
 
 @app.post("/adresler", response_model=AdresCevap, tags=["Adresler"])
 def adres_ekle(veri: AdresOlustur, db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    _adresleri_kilitle(db, kullanici)
     adet = db.query(Adres).filter(Adres.kullanici_id == kullanici.id).count()
     if adet >= ADRES_SINIRI:
         raise HTTPException(status_code=400, detail=f"En fazla {ADRES_SINIRI} adres kaydedebilirsiniz")
@@ -176,6 +182,7 @@ def adres_guncelle(adres_id: int, veri: AdresOlustur, db: Session = Depends(get_
 
 @app.post("/adresler/{adres_id}/varsayilan", response_model=AdresCevap, tags=["Adresler"])
 def adresi_varsayilan_yap(adres_id: int, db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    _adresleri_kilitle(db, kullanici)
     adres = _kendi_adresi(db, adres_id, kullanici)
     db.query(Adres).filter(Adres.kullanici_id == kullanici.id, Adres.id != adres.id).update({Adres.varsayilan: False})
     adres.varsayilan = True
@@ -186,6 +193,7 @@ def adresi_varsayilan_yap(adres_id: int, db: Session = Depends(get_db), kullanic
 
 @app.delete("/adresler/{adres_id}", tags=["Adresler"])
 def adres_sil(adres_id: int, db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    _adresleri_kilitle(db, kullanici)
     adres = _kendi_adresi(db, adres_id, kullanici)
     varsayilandi = adres.varsayilan
     db.delete(adres)

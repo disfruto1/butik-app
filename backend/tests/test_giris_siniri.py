@@ -76,6 +76,13 @@ def test_basarili_giris_ip_sayacini_sifirlamaz(client, musteri, monkeypatch):
     assert giris(client, "sifre123").status_code == 429
 
 
+def test_basarili_girisler_ip_sayacini_doldurmaz(client, musteri, monkeypatch):
+    # Ayni IP'yi paylasan musteriler (mobil operator agi) birbirini kilitlememeli
+    monkeypatch.setattr(giris_siniri, "IP_SINIRI", 3)
+    for _ in range(6):
+        assert giris(client, "sifre123").status_code == 200
+
+
 def test_kayitli_olmayan_eposta_ayni_davranir(client):
     # Yanit farki olursa hangi e-postalarin kayitli oldugu anlasilir
     r = giris(client, e_posta="yok@example.com")

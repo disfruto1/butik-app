@@ -55,7 +55,7 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 ## Faz 5 — Kalite ve yayına hazırlık
 
 - [ ] Veritabanı değişiklikleri için Alembic migration'ları (şimdilik `backend/migrate.py` eksik kolonları ekliyor)
-- [x] Backend testleri (pytest, 42 test). Frontend testleri henüz yok
+- [x] Backend testleri (pytest, 49 test; 6 eşzamanlılık testi yalnızca PostgreSQL'de çalışır, CI'da henüz atlanıyor). Frontend testleri henüz yok
 - [ ] Refresh token veya daha uzun oturum stratejisi
 - [x] Giriş denemesi koruması: 15 dakikada aynı IP'den aynı hesaba 5, aynı IP'den toplam 30 başarısız deneme (`backend/giris_siniri.py`)
 - [ ] Genel istek sınırlama (kayıt ve diğer uçlar için rate limit)
