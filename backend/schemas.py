@@ -10,6 +10,16 @@ class KullaniciOlustur(BaseModel):
     sifre: str = Field(min_length=6, max_length=72)  # bcrypt en fazla 72 bayt isler
 
 
+class SifirlamaIstek(BaseModel):
+    e_posta: EmailStr
+
+
+class SifirlamaTamamla(BaseModel):
+    e_posta: EmailStr
+    kod: str = Field(min_length=8, max_length=8, pattern=r"^[0-9]{8}$")
+    yeni_sifre: str = Field(min_length=6, max_length=72)
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str

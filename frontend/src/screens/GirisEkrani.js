@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import api, { hataMesaji } from '../services/api';
+import api, { hataMesaji, sinirMesaji } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { renk } from '../theme';
 
 function girisHataMesaji(error) {
   const durum = error.response?.status;
   if (durum === 401) return 'E-posta veya şifre yanlış.';
-  if (durum === 429) {
-    const saniye = Number(error.response.headers?.['retry-after']);
-    const sure = saniye > 0 ? `${Math.ceil(saniye / 60)} dakika sonra` : 'daha sonra';
-    return `Çok fazla başarısız deneme yapıldı. Lütfen ${sure} tekrar deneyin.`;
-  }
+  if (durum === 429) return sinirMesaji(error);
   if (error.response) return 'Giriş yapılamadı. Lütfen biraz sonra tekrar deneyin.';
   return hataMesaji(error); // sunucuya ulaşılamadı
 }
@@ -70,7 +66,10 @@ export default function GirisEkrani({ navigation }) {
       >
         <Text style={styles.butonYazi}>{yukleniyor ? 'Giriş yapılıyor...' : 'Giriş Yap'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.baglanti} onPress={() => navigation.navigate('Kayit')}>
+      <TouchableOpacity style={styles.baglanti} onPress={() => navigation.navigate('SifreSifirlama')}>
+        <Text style={styles.baglantiYazi}>Şifremi unuttum</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.baglantiAlt} onPress={() => navigation.navigate('Kayit')}>
         <Text style={styles.baglantiYazi}>Hesabınız yok mu? Kayıt olun</Text>
       </TouchableOpacity>
     </KeyboardAvoidingView>
@@ -86,5 +85,6 @@ const styles = StyleSheet.create({
   butonDevre: { backgroundColor: renk.devre },
   butonYazi: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   baglanti: { marginTop: 20, padding: 8 },
+  baglantiAlt: { marginTop: 4, padding: 8 },
   baglantiYazi: { color: renk.baglanti, fontSize: 15 },
 });

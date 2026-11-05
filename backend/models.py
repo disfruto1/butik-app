@@ -38,6 +38,8 @@ class Kullanici(Base):
     sifre_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     rol: Mapped[str] = mapped_column(String(20), default=KullaniciRol.MUSTERI, nullable=False)
     aktif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Sifre degisince artar; eski surumle imzalanmis oturumlar gecersiz olur
+    token_surumu: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     olusturulma_tarihi: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     siparisler: Mapped[list["Siparis"]] = relationship(back_populates="kullanici")
 
@@ -47,6 +49,14 @@ class GirisDenemesi(Base):
     anahtar: Mapped[str] = mapped_column(String(64), primary_key=True)  # sha256, e-posta/IP duz metin saklanmaz
     sayi: Mapped[int] = mapped_column(Integer, nullable=False)
     pencere_basi: Mapped[int] = mapped_column(BigInteger, nullable=False)  # unix zamani (saniye)
+
+class SifreSifirlamaKodu(Base):
+    """Kullanici basina en fazla bir gecerli kod (bkz. sifre_sifirlama.py)."""
+    __tablename__ = "sifre_sifirlama_kodlari"
+    kullanici_id: Mapped[int] = mapped_column(ForeignKey("kullanicilar.id"), primary_key=True)
+    kod_ozeti: Mapped[str] = mapped_column(String(64), nullable=False)  # kodun kendisi saklanmaz
+    son_kullanma: Mapped[int] = mapped_column(BigInteger, nullable=False)  # unix zamani (saniye)
+    yanlis_deneme: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 class Adres(Base):
     __tablename__ = "adresler"

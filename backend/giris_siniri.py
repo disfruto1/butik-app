@@ -26,6 +26,9 @@ from models import GirisDenemesi
 PENCERE_SANIYE = 15 * 60
 HESAP_SINIRI = 5
 IP_SINIRI = 30
+SIFIRLAMA_EPOSTA_SINIRI = 3
+SIFIRLAMA_IP_SINIRI = 10
+SIFIRLAMA_DENEME_IP_SINIRI = 30
 _TEKRAR = 3  # ayni anda acilan ilk kayit carpismasi icin deneme sayisi
 
 
@@ -49,14 +52,10 @@ def _kilitli_getir(db: Session, anahtar: str):
     return db.query(GirisDenemesi).filter(GirisDenemesi.anahtar == anahtar).with_for_update().first()
 
 
-def _dene(db: Session, e_posta: str, ip: str) -> int:
+def _dene(db: Session, sayaclar: list[tuple[str, int]]) -> int:
     simdi = _simdi()
-    # Kilit sirasi her istekte ayni (hesap, sonra IP): kilitlenme (deadlock) olmaz
-    sayaclar = [
-        (_hesap_anahtari(e_posta, ip), HESAP_SINIRI),
-        (_ip_anahtari(ip), IP_SINIRI),
-    ]
-    kayitlar = [(anahtar, sinir, _kilitli_getir(db, anahtar)) for anahtar, sinir in sayaclar]
+    # Kilit sirasi her istekte ayni (ilki hesap, sonra IP): kilitlenme (deadlock) olmaz
+    kayitlar =[(anahtar, sinir, _kilitli_getir(db, anahtar)) for anahtar, sinir in sayaclar]
 
     kalan = 0
     for _, sinir, kayit in kayitlar:
@@ -96,9 +95,31 @@ def _eskileri_sil(db: Session) -> None:
 
 def deneme_baslat(db: Session, e_posta: str, ip: str) -> int:
     """Denemeyi sayar ve devam edilebiliyorsa 0 dondurur. Sinir doluysa kac saniye kaldigini dondurur (sayaca eklemez)."""
+    return _say(db, [(_hesap_anahtari(e_posta, ip), HESAP_SINIRI), (_ip_anahtari(ip), IP_SINIRI)])
+
+
+def sifirlama_istegi_say(db: Session, e_posta: str, ip: str) -> int:
+    """Kod isteklerini sayar. E-posta sayaci IP'den bagimsizdir: farkli IP'lerden de posta kutusu doldurulamaz."""
+    return _say(db, [
+        (_anahtar("sifirlama-eposta", e_posta), SIFIRLAMA_EPOSTA_SINIRI),
+        (_anahtar("sifirlama-ip", ip), SIFIRLAMA_IP_SINIRI),
+    ])
+
+
+def sifirlama_denemesi_say(db: Session, ip: str) -> int:
+    """Kod girme denemelerini IP'ye gore sayar: ayni IP'den cok sayida hesaba kod denenemesin."""
+    return _say(db, [(_anahtar("sifirlama-deneme-ip", ip), SIFIRLAMA_DENEME_IP_SINIRI)])
+
+
+def hesap_sayacini_sifirla(db: Session, e_posta: str, ip: str) -> None:
+    """Sifre sifirlaninca kullanici eski sifre denemeleri yuzunden kilitli kalmasin. Commit etmez."""
+    db.query(GirisDenemesi).filter(GirisDenemesi.anahtar == _hesap_anahtari(e_posta, ip)).delete(synchronize_session=False)
+
+
+def _say(db: Session, sayaclar: list[tuple[str, int]]) -> int:
     for i in range(_TEKRAR):
         try:
-            kalan = _dene(db, e_posta, ip)
+            kalan = _dene(db, sayaclar)
             break
         except IntegrityError:
             # Ayni anda gelen baska bir istek kaydi once acti: var olan kayit uzerinden tekrar say

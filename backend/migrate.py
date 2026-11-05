@@ -12,6 +12,7 @@ from sqlalchemy.exc import ProgrammingError
 EKLENECEK_KOLONLAR = [
     ("urunler", "gorsel_url", "VARCHAR(500)"),
     ("siparisler", "takip_no", "VARCHAR(100)"),
+    ("kullanicilar", "token_surumu", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

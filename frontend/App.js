@@ -10,6 +10,7 @@ import { CartProvider } from './src/context/CartContext';
 import { FavoriProvider } from './src/context/FavoriContext';
 import GirisEkrani from './src/screens/GirisEkrani';
 import KayitEkrani from './src/screens/KayitEkrani';
+import SifreSifirlamaEkrani from './src/screens/SifreSifirlamaEkrani';
 import UrunlerEkrani from './src/screens/UrunlerEkrani';
 import UrunDetayEkrani from './src/screens/UrunDetayEkrani';
 import FavorilerEkrani from './src/screens/FavorilerEkrani';
@@ -33,6 +34,7 @@ function GirisAkisi() {
     <AuthStack.Navigator screenOptions={ortakSecenekler}>
       <AuthStack.Screen name="Giris" component={GirisEkrani} options={{ headerShown: false }} />
       <AuthStack.Screen name="Kayit" component={KayitEkrani} options={{ title: 'Kayıt Ol' }} />
+      <AuthStack.Screen name="SifreSifirlama" component={SifreSifirlamaEkrani} options={{ title: 'Şifremi Unuttum' }} />
     </AuthStack.Navigator>
   );
 }

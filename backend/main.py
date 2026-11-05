@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, Request, status
+from fastapi import BackgroundTasks, FastAPI, Depends, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import func, or_
@@ -15,13 +15,16 @@ from migrate import kolonlari_tamamla
 from models import Adres, Kullanici, KullaniciRol, Urun, Kategori, Siparis, SiparisKalemi, SiparisDurum
 from schemas import (
     AdresOlustur, AdresCevap,
+    SifirlamaIstek, SifirlamaTamamla,
     KullaniciOlustur, KullaniciCevap, Token,
     KategoriOlustur, KategoriCevap,
     UrunOlustur, UrunCevap, AktifGuncelle,
     SiparisOlustur, SiparisCevap, SiparisDurumGuncelle,
 )
 from auth import sifreyi_hashle, giris_sifresini_dogrula, token_olustur, tokeni_coz
+import eposta
 import giris_siniri
+import sifre_sifirlama
 
 models.Base.metadata.create_all(bind=engine)
 kolonlari_tamamla(engine)
@@ -53,12 +56,12 @@ def get_db():
 
 
 def aktif_kullanici_getir(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Kullanici:
-    e_posta = tokeni_coz(token)
+    e_posta, token_surumu = tokeni_coz(token)
     if not e_posta:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Gecersiz token", headers={"WWW-Authenticate": "Bearer"})
     kullanici = db.query(Kullanici).filter(Kullanici.e_posta == e_posta).first()
-    if not kullanici or not kullanici.aktif:
-        # Silinmis/pasif kullanicinin eski token'i: oturum gecersiz sayilir (uygulama otomatik cikis yapar)
+    if not kullanici or not kullanici.aktif or kullanici.token_surumu != token_surumu:
+        # Silinmis/pasif kullanicinin veya sifre degismeden onceki token: oturum gecersiz sayilir (uygulama otomatik cikis yapar)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kullanici bulunamadi", headers={"WWW-Authenticate": "Bearer"})
     return kullanici
 
@@ -116,8 +119,58 @@ def kullanici_giris(request: Request, form: OAuth2PasswordRequestForm = Depends(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-posta veya sifre yanlis")
 
     giris_siniri.basarili_giris(db, e_posta, ip)
-    token = token_olustur({"sub": kullanici.e_posta})
+    token = token_olustur({"sub": kullanici.e_posta, "tv": kullanici.token_surumu})
     return {"access_token": token, "token_type": "bearer"}
+
+
+def _cok_fazla_istek(kalan: int) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Cok fazla deneme. Lutfen daha sonra tekrar deneyin.",
+        headers={"Retry-After": str(kalan)},
+    )
+
+
+def _sifirlama_kodu_gonder(alici: str, kod: str):
+    eposta.gonder(
+        alici,
+        "Butik App şifre sıfırlama kodunuz",
+        f"Şifre sıfırlama kodunuz: {kod}\n\n"
+        "Kod 15 dakika geçerlidir. Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz; şifreniz değişmez.",
+    )
+
+
+@app.post("/sifre-sifirlama/iste", tags=["Auth"])
+def sifirlama_iste(veri: SifirlamaIstek, request: Request, arka_plan: BackgroundTasks, db: Session = Depends(get_db)):
+    """Yanit her zaman aynidir: hangi e-postalarin kayitli oldugu anlasilmasin. E-posta arka planda
+    gonderilir, boylece yanit suresi de hesabin var olup olmadigini ele vermez."""
+    e_posta = veri.e_posta.strip().lower()
+    ip = request.client.host if request.client else "bilinmiyor"
+    kalan = giris_siniri.sifirlama_istegi_say(db, e_posta, ip)
+    if kalan:
+        raise _cok_fazla_istek(kalan)
+    kullanici = db.query(Kullanici).filter(func.lower(Kullanici.e_posta) == e_posta).first()
+    if kullanici and kullanici.aktif:
+        kod = sifre_sifirlama.kod_olustur(db, kullanici.id)
+        arka_plan.add_task(_sifirlama_kodu_gonder, kullanici.e_posta, kod)
+    return {"mesaj": "Bu e-posta kayitliysa sifirlama kodu gonderildi."}
+
+
+@app.post("/sifre-sifirlama/tamamla", tags=["Auth"])
+def sifirlama_tamamla(veri: SifirlamaTamamla, request: Request, db: Session = Depends(get_db)):
+    e_posta = veri.e_posta.strip().lower()
+    ip = request.client.host if request.client else "bilinmiyor"
+    kalan = giris_siniri.sifirlama_denemesi_say(db, ip)
+    if kalan:
+        raise _cok_fazla_istek(kalan)
+    kullanici = db.query(Kullanici).filter(func.lower(Kullanici.e_posta) == e_posta).first()
+    if not kullanici or not kullanici.aktif or not sifre_sifirlama.kodu_dogrula_ve_harca(db, kullanici.id, veri.kod):
+        raise HTTPException(status_code=400, detail="Kod gecersiz veya suresi dolmus")
+    kullanici.sifre_hash = sifreyi_hashle(veri.yeni_sifre)
+    kullanici.token_surumu += 1  # eski oturumlar kapanir (telefonu calinan biri icin onemli)
+    giris_siniri.hesap_sayacini_sifirla(db, e_posta, ip)
+    db.commit()
+    return {"mesaj": "Sifreniz degistirildi."}
 
 
 @app.get("/ben", response_model=KullaniciCevap, tags=["Auth"])

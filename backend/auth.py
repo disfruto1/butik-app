@@ -43,8 +43,9 @@ def token_olustur(data):
 
 
 def tokeni_coz(token):
+    """(e_posta, token_surumu) dondurur, gecersizse (None, 0). Eski tokenlarda surum yoktur, 0 sayilir."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("sub")
+        return payload.get("sub"), payload.get("tv", 0)
     except JWTError:
-        return None
+        return None, 0
