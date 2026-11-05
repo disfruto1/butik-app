@@ -12,8 +12,9 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models
 from migrate import kolonlari_tamamla
-from models import Kullanici, KullaniciRol, Urun, Kategori, Siparis, SiparisKalemi, SiparisDurum
+from models import Adres, Kullanici, KullaniciRol, Urun, Kategori, Siparis, SiparisKalemi, SiparisDurum
 from schemas import (
+    AdresOlustur, AdresCevap,
     KullaniciOlustur, KullaniciCevap, Token,
     KategoriOlustur, KategoriCevap,
     UrunOlustur, UrunCevap, AktifGuncelle,
@@ -108,6 +109,79 @@ def kullanici_giris(form: OAuth2PasswordRequestForm = Depends(), db: Session = D
 @app.get("/ben", response_model=KullaniciCevap, tags=["Auth"])
 def benim_bilgilerim(kullanici: Kullanici = Depends(aktif_kullanici_getir)):
     return kullanici
+
+
+# ----------------------------------------------------------------- Adresler
+# Siparis adresin metnini kopyalar, bu yuzden adres silinse de eski siparisler etkilenmez.
+
+ADRES_SINIRI = 20
+
+
+def _kendi_adresi(db: Session, adres_id: int, kullanici: Kullanici) -> Adres:
+    # Baskasinin adresini "yok" gibi goster (varligini sizdirma)
+    adres = db.query(Adres).filter(Adres.id == adres_id, Adres.kullanici_id == kullanici.id).first()
+    if not adres:
+        raise HTTPException(status_code=404, detail="Adres bulunamadi")
+    return adres
+
+
+@app.get("/adresler", response_model=list[AdresCevap], tags=["Adresler"])
+def adresleri_listele(db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    """Varsayilan adres en ustte."""
+    return (
+        db.query(Adres)
+        .filter(Adres.kullanici_id == kullanici.id)
+        .order_by(Adres.varsayilan.desc(), Adres.id.desc())
+        .all()
+    )
+
+
+@app.post("/adresler", response_model=AdresCevap, tags=["Adresler"])
+def adres_ekle(veri: AdresOlustur, db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    adet = db.query(Adres).filter(Adres.kullanici_id == kullanici.id).count()
+    if adet >= ADRES_SINIRI:
+        raise HTTPException(status_code=400, detail=f"En fazla {ADRES_SINIRI} adres kaydedebilirsiniz")
+    # Ilk adres otomatik varsayilan olur
+    yeni = Adres(kullanici_id=kullanici.id, baslik=veri.baslik.strip(), adres=veri.adres.strip(), varsayilan=adet == 0)
+    db.add(yeni)
+    db.commit()
+    db.refresh(yeni)
+    return yeni
+
+
+@app.put("/adresler/{adres_id}", response_model=AdresCevap, tags=["Adresler"])
+def adres_guncelle(adres_id: int, veri: AdresOlustur, db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    adres = _kendi_adresi(db, adres_id, kullanici)
+    adres.baslik = veri.baslik.strip()
+    adres.adres = veri.adres.strip()
+    db.commit()
+    db.refresh(adres)
+    return adres
+
+
+@app.post("/adresler/{adres_id}/varsayilan", response_model=AdresCevap, tags=["Adresler"])
+def adresi_varsayilan_yap(adres_id: int, db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    adres = _kendi_adresi(db, adres_id, kullanici)
+    db.query(Adres).filter(Adres.kullanici_id == kullanici.id, Adres.id != adres.id).update({Adres.varsayilan: False})
+    adres.varsayilan = True
+    db.commit()
+    db.refresh(adres)
+    return adres
+
+
+@app.delete("/adresler/{adres_id}", tags=["Adresler"])
+def adres_sil(adres_id: int, db: Session = Depends(get_db), kullanici: Kullanici = Depends(aktif_kullanici_getir)):
+    adres = _kendi_adresi(db, adres_id, kullanici)
+    varsayilandi = adres.varsayilan
+    db.delete(adres)
+    db.flush()
+    if varsayilandi:
+        # Adres kaldiysa kullanici varsayilansiz kalmasin
+        siradaki = db.query(Adres).filter(Adres.kullanici_id == kullanici.id).order_by(Adres.id.desc()).first()
+        if siradaki:
+            siradaki.varsayilan = True
+    db.commit()
+    return {"mesaj": "Adres silindi"}
 
 
 # ----------------------------------------------------------------- Kategoriler

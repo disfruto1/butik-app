@@ -35,7 +35,7 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 - [x] Sayfalama (backend `limit/offset`, frontend sonsuz kaydırma)
 - [x] Sepetin telefonda kalıcı olması (AsyncStorage)
 - [x] Favoriler
-- [ ] Adres defteri (kayıtlı adresler). Şimdilik adres her siparişte elle yazılıyor
+- [x] Adres defteri (kayıtlı adresler, varsayılan adres, sepette seçim). Sipariş adresin metnini kopyalar, adres silinse de eski siparişler etkilenmez
 
 ## Faz 3 — Yönetici paneli
 
@@ -55,7 +55,7 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 ## Faz 5 — Kalite ve yayına hazırlık
 
 - [ ] Veritabanı değişiklikleri için Alembic migration'ları (şimdilik `backend/migrate.py` eksik kolonları ekliyor)
-- [x] Backend testleri (pytest, 16 test). Frontend testleri henüz yok
+- [x] Backend testleri (pytest, 29 test). Frontend testleri henüz yok
 - [ ] Refresh token veya daha uzun oturum stratejisi
 - [ ] İstek sınırlama (rate limit), giriş denemesi koruması
 - [ ] Şifre sıfırlama (e-posta ile)

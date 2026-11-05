@@ -71,6 +71,21 @@ class UrunCevap(BaseModel):
         from_attributes = True
 
 
+class AdresOlustur(BaseModel):
+    baslik: str = Field(min_length=1, max_length=60)
+    adres: str = Field(min_length=10, max_length=500)  # siparisteki kargo_adres ile ayni sinirlar
+
+
+class AdresCevap(BaseModel):
+    id: int
+    baslik: str
+    adres: str
+    varsayilan: bool
+
+    class Config:
+        from_attributes = True
+
+
 class SiparisKalemiOlustur(BaseModel):
     urun_id: int
     adet: int = Field(gt=0, le=1000)

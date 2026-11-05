@@ -117,6 +117,9 @@ export default function UrunlerEkrani({ navigation }) {
         <TouchableOpacity onPress={() => navigation.navigate('Sepet')} style={styles.menuButon}>
           <Text style={styles.menuYazi}>Sepet{toplamAdet > 0 ? ` (${toplamAdet})` : ''}</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Adresler')} style={styles.menuButon}>
+          <Text style={styles.menuYazi}>Adreslerim</Text>
+        </TouchableOpacity>
         {yonetici ? (
           <TouchableOpacity onPress={() => navigation.navigate('Yonetim')} style={styles.menuButon}>
             <Text style={[styles.menuYazi, styles.yonetimYazi]}>Yönetim</Text>

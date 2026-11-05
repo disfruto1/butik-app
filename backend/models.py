@@ -41,6 +41,15 @@ class Kullanici(Base):
     olusturulma_tarihi: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     siparisler: Mapped[list["Siparis"]] = relationship(back_populates="kullanici")
 
+class Adres(Base):
+    __tablename__ = "adresler"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kullanici_id: Mapped[int] = mapped_column(ForeignKey("kullanicilar.id"), index=True, nullable=False)
+    baslik: Mapped[str] = mapped_column(String(60), nullable=False)
+    adres: Mapped[str] = mapped_column(Text, nullable=False)
+    varsayilan: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    olusturulma_tarihi: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
 class SiparisDurum:
     ODEME_BEKLIYOR = "odeme_bekliyor"
     ODENDI = "odendi"
