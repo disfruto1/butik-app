@@ -44,6 +44,20 @@ class Kullanici(Base):
     olusturulma_tarihi: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     siparisler: Mapped[list["Siparis"]] = relationship(back_populates="kullanici")
 
+class KullaniciOnayi(Base):
+    """Aydinlatma ve izin kayitlari (bkz. yasal_metinler.py). Ispat icin tutulur: satirlar guncellenmez,
+    izin geri alinirsa verildi=False olan yeni satir eklenir."""
+    __tablename__ = "kullanici_onaylari"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kullanici_id: Mapped[int] = mapped_column(ForeignKey("kullanicilar.id"), index=True, nullable=False)
+    tur: Mapped[str] = mapped_column(String(20), nullable=False)
+    verildi: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    metin_surumu: Mapped[str] = mapped_column(String(16), nullable=False)
+    # Izni verilen e-posta veya telefon: kullanici bilgisini sonradan degistirse de kayit dogru kalir
+    iletisim_adresi: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ip: Mapped[str] = mapped_column(String(45), nullable=False)
+    tarih: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
 class GirisDenemesi(Base):
     """Basarisiz giris sayaci (bkz. giris_siniri.py)."""
     __tablename__ = "giris_denemeleri"

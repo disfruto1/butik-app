@@ -1,3 +1,5 @@
+from conftest import kayit_ol
+
 ADRES = "Ataturk Mah. Cicek Sok. No:5 Daire:3 Kadikoy / Istanbul"
 
 
@@ -16,7 +18,7 @@ def siparis_ver(client, musteri, urun_id, adet):
 # ---------------------------------------------------------------- Auth
 
 def test_kayit_ve_giris(client):
-    r = client.post("/kayit", json={"ad": "Ayse", "e_posta": "Ayse@Example.com", "sifre": "sifre123"})
+    r = kayit_ol(client, "Ayse", "Ayse@Example.com")
     assert r.status_code == 200
     assert r.json()["rol"] == "musteri"
     # buyuk/kucuk harf farki olmadan giris
@@ -27,9 +29,8 @@ def test_kayit_ve_giris(client):
 
 
 def test_ayni_eposta_iki_kez_kayit_olamaz(client):
-    veri = {"ad": "Ayse", "e_posta": "ayse@example.com", "sifre": "sifre123"}
-    assert client.post("/kayit", json=veri).status_code == 200
-    assert client.post("/kayit", json={**veri, "e_posta": "AYSE@example.com"}).status_code == 400
+    assert kayit_ol(client, "Ayse", "ayse@example.com").status_code == 200
+    assert kayit_ol(client, "Ayse", "AYSE@example.com").status_code == 400
 
 
 def test_yanlis_sifre_401(client, musteri):
@@ -123,7 +124,7 @@ def test_odenmis_siparis_musteri_tarafindan_iptal_edilemez(client, yonetici, mus
 def test_musteri_baskasinin_siparisini_goremez(client, yonetici, musteri):
     u = urun_ekle(client, yonetici)
     s = siparis_ver(client, musteri, u["id"], 1).json()
-    client.post("/kayit", json={"ad": "Diger", "e_posta": "diger@example.com", "sifre": "sifre123"})
+    kayit_ol(client, "Diger", "diger@example.com")
     r = client.post("/giris", data={"username": "diger@example.com", "password": "sifre123"})
     diger = {"Authorization": "Bearer " + r.json()["access_token"]}
     assert client.get(f"/siparisler/{s['id']}", headers=diger).status_code == 404

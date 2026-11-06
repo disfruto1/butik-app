@@ -45,6 +45,13 @@ def client():
     return TestClient(app)
 
 
+def kayit_ol(client, ad, e_posta, sifre="sifre123", **ek):
+    """Uygulama gibi kayit olur: guncel metin surumuyle ve aydinlatma okunmus olarak."""
+    veri = {"ad": ad, "e_posta": e_posta, "sifre": sifre, "aydinlatma_okundu": True, "metin_surumu": client.get("/yasal/kayit").json()["surum"]}
+    veri.update(ek)
+    return client.post("/kayit", json=veri)
+
+
 def _kullanici_ac(e_posta, rol):
     db = SessionLocal()
     try:

@@ -87,4 +87,7 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 - `PAYTR_TEST_MODU=1` iken para alınmaz ama sipariş "Ödendi" olur. Yayında 0 olmalı, yoksa ürün parası alınmadan kargolanabilir.
 - Kart denenip vazgeçilen sipariş 45 dakika sonra iptal olur. Müşteri aynı siparişi sonradan havaleyle ödemek isterse yeni sipariş vermelidir.
 - Yönetici "Ödendi" siparişi iptal ederse kart ücreti otomatik iade edilmez, PayTR panelinden iade gerekir.
+- Aydınlatma ve izin metinleri (`backend/yasal_metinler.py`) taslaktır, hukuki kontrol gerekir. Üyelikte onaylar `kullanici_onaylari` tablosuna yazılır. İlk kampanyadan önce gerekenler: İYS kaydı ve izinlerin 3 iş günü içinde aktarımı, izin sonrası 24 saat içinde bilgilendirme, her iletide ret yolu, izni geri alma ekranı. Bunlar olmadan kampanya gönderilmemeli.
+- `destek@yulamoda.com` metinlerde başvuru adresi olarak geçiyor ama alan adında MX kaydı yok, yani bu adrese posta gelmiyor. Yayından önce posta kutusu veya yönlendirme kurulmalı.
+- Hesap silme özelliği yok. KVKK silme hakkı için başvurular şimdilik elle karşılanır, mağaza kuralları için uygulamaya eklenmeli. Aydınlatma metni üyelikten sonra uygulama içinden açılamıyor.
 - Şifre sıfırlama kodu e-posta servisi ayarlanana kadar gitmez: `SMTP_*` ayarları boşsa müşteri kod alamaz, uygulama yine de "gönderildi" der (hesap varlığı sızmasın diye). Yayından önce ayarlanmalı.
