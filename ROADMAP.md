@@ -83,7 +83,7 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 - Ödeme otomatik değil: yönetici havaleyi kontrol edip siparişi elle "Ödendi" yapmalı.
 - Giriş sınırı IP adresine bakar. `deploy/` kurulumu bunu çözer (Caddy gerçek IP'yi okur, uygulama yalnızca Caddy'ye güvenir). Backend başka bir proxy arkasında çalıştırılırsa aynı ayar yapılmalı; yoksa tüm müşteriler aynı IP'den geliyor görünür ve birbirinin sınırını doldurur.
 - Çok sayıda farklı IP'den tek hesaba yapılan denemeleri giriş sınırı durdurmaz. Yayında proxy veya servis sağlayıcı katmanında da koruma düşünülmeli.
-- PayTR mağazası web sitesiyle paylaşılıyor. Paneldeki Bildirim URL'si değiştirilirse web sitesinin siparişleri onaylanmayabilir. Panelde ikinci adres tanımlanabiliyor, ama bildirimin hangi adrese gittiği henüz bilinmiyor; her bildirim ikisine de gidiyorsa uygulamanın web sitesi siparişlerine verdiği 404 düzeltilmeli. Uygulama siparişleri `BUTIK` önekiyle başlar, böylece bildirimler ayırt edilebilir.
+- PayTR mağazası web sitesiyle paylaşılıyor. Paneldeki Bildirim URL'si değiştirilirse web sitesinin siparişleri onaylanmayabilir. Mağaza başına ikinci Bildirim URL'si tanımlanıp tanımlanamayacağı doğrulanmadı, PayTR'a sorulacak (paneldeki 2. e-posta alanı bu işi görmez). Tek adres varsa seçenekler `deploy/YAYIN.md` içinde. Uygulama siparişleri `BUTIK` önekiyle başlar, böylece bildirimler ayırt edilebilir.
 - `PAYTR_TEST_MODU=1` iken para alınmaz ama sipariş "Ödendi" olur. Yayında 0 olmalı, yoksa ürün parası alınmadan kargolanabilir.
 - Kart denenip vazgeçilen sipariş 45 dakika sonra iptal olur. Müşteri aynı siparişi sonradan havaleyle ödemek isterse yeni sipariş vermelidir.
 - Yönetici "Ödendi" siparişi iptal ederse kart ücreti otomatik iade edilmez, PayTR panelinden iade gerekir.

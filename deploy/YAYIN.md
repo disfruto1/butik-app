@@ -73,8 +73,12 @@ Yedekler `deploy/yedekler/` altında 14 gün kalır. **Sunucu giderse bunlar da 
 
 Web sitesinin ödemeleri aynı mağazadan geçiyor. **Paneldeki mevcut Bildirim URL'sini değiştirmeyin.**
 
-1. PayTR'dan öğrenin: iki bildirim adresi olunca bildirim hangisine gidiyor? Her bildirim ikisine de gidiyorsa, uygulamanın web sitesi siparişlerine verdiği 404 cevabı düzeltilmeden açmayın.
-2. İkinci adres olarak ekleyin: `https://api.yulamoda.com/odeme/paytr/bildirim`
+1. PayTR'dan öğrenin: mağaza başına birden fazla Bildirim URL'si tanımlanabilir mi? Paneldeki 2. e-posta alanı bu işi görmez, siparişi "Ödendi" yapan şey bildirim adresine gelen istektir. Bu cevap gelmeden kart ödemesini açmayın.
+2. Uygulamanın bildirim adresi `https://api.yulamoda.com/odeme/paytr/bildirim`. Cevaba göre:
+   - **İkinci adres tanımlanabiliyorsa:** bu adresi ekleyin. Her bildirim ikisine de gidiyorsa, uygulamanın web sitesi siparişlerine verdiği 404 cevabı önce düzeltilmeli.
+   - **Tek adres varsa (önerilen):** sitenin bildirim kodu `BUTIK` ile başlayan siparişleri bu adrese gövdesini değiştirmeden aktarır ve PayTR'a `OK`'u yalnızca backend `OK` dönerse verir.
+   - **Tek adres varsa (alternatif):** uygulama için ayrı PayTR mağazası açılır, adres oranın paneline yazılır.
+   - Paneldeki adresi backend'e çevirmeyin: backend durursa sitenin ödemeleri de onaylanmaz.
 3. `.env` içine `PAYTR_MERCHANT_ID`, `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT` yazın, `PAYTR_TEST_MODU=1` bırakın, `docker compose up -d` çalıştırın.
 4. Telefonda PayTR'ın test kartıyla baştan sona deneyin: başarılı ödeme, reddedilen kart, vazgeçme. Sipariş "Ödendi" olmalı, web sitesinin ödemeleri etkilenmemeli.
 5. Her şey doğruysa `PAYTR_TEST_MODU=0` yapın, `docker compose up -d` çalıştırın ve küçük tutarlı gerçek bir ödemeyle deneyip iade edin.
