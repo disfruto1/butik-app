@@ -62,7 +62,7 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 - [x] Giriş denemesi koruması: 15 dakikada aynı IP'den aynı hesaba 5, aynı IP'den toplam 30 başarısız deneme (`backend/giris_siniri.py`)
 - [ ] Genel istek sınırlama (kayıt ve diğer uçlar için rate limit)
 - [x] Şifre sıfırlama (e-postayla 8 haneli kod, SMTP ile). Yayında çalışması için `SMTP_*` ayarları ve e-posta servisi gerekir
-- [ ] Docker ile backend, HTTPS'li sunucuya yayın
+- [ ] Docker ile backend, HTTPS'li sunucuya yayın. Kurulum hazır ve CI'da deneniyor (`deploy/`), sunucu seçimi ve gerçek yayın bekliyor
 - [x] CI (GitHub Actions): backend testleri çalışıyor (`.github/workflows/ci.yml`). Lint ve frontend kontrolleri henüz yok
 - [ ] EAS ile Android/iOS build, mağaza hazırlığı
 - [ ] Hata izleme (ör. Sentry)
@@ -81,9 +81,9 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak.
 - Eski `SECRET_KEY` repo geçmişinde duruyor. Yerel `.env`'deki anahtar ondan farklı; yayın sunucusunda da mutlaka yeni bir anahtar üretilmeli.
 - Sepet ve favoriler telefonda saklanır (hesaba bağlı değil), çıkış yapınca silinir. Fiyat ve stok her zaman sunucudan doğrulanır.
 - Ödeme otomatik değil: yönetici havaleyi kontrol edip siparişi elle "Ödendi" yapmalı.
-- Giriş sınırı IP adresine bakar. Yayında backend bir proxy (Nginx vb.) arkasındaysa `uvicorn --proxy-headers --forwarded-allow-ips=<proxy IP>` ile çalıştırılmalı; yoksa tüm müşteriler aynı IP'den geliyor görünür ve birbirinin sınırını doldurur.
+- Giriş sınırı IP adresine bakar. `deploy/` kurulumu bunu çözer (Caddy gerçek IP'yi okur, uygulama yalnızca Caddy'ye güvenir). Backend başka bir proxy arkasında çalıştırılırsa aynı ayar yapılmalı; yoksa tüm müşteriler aynı IP'den geliyor görünür ve birbirinin sınırını doldurur.
 - Çok sayıda farklı IP'den tek hesaba yapılan denemeleri giriş sınırı durdurmaz. Yayında proxy veya servis sağlayıcı katmanında da koruma düşünülmeli.
-- PayTR mağazası web sitesiyle paylaşılıyor. Paneldeki Bildirim URL'si değiştirilirse web sitesinin siparişleri onaylanmayabilir. Aynı mağazada ikinci adres tanımlanıp tanımlanamayacağı PayTR'a sorulmalı. Uygulama siparişleri `BUTIK` önekiyle başlar, böylece bildirimler ayırt edilebilir.
+- PayTR mağazası web sitesiyle paylaşılıyor. Paneldeki Bildirim URL'si değiştirilirse web sitesinin siparişleri onaylanmayabilir. Panelde ikinci adres tanımlanabiliyor, ama bildirimin hangi adrese gittiği henüz bilinmiyor; her bildirim ikisine de gidiyorsa uygulamanın web sitesi siparişlerine verdiği 404 düzeltilmeli. Uygulama siparişleri `BUTIK` önekiyle başlar, böylece bildirimler ayırt edilebilir.
 - `PAYTR_TEST_MODU=1` iken para alınmaz ama sipariş "Ödendi" olur. Yayında 0 olmalı, yoksa ürün parası alınmadan kargolanabilir.
 - Kart denenip vazgeçilen sipariş 45 dakika sonra iptal olur. Müşteri aynı siparişi sonradan havaleyle ödemek isterse yeni sipariş vermelidir.
 - Yönetici "Ödendi" siparişi iptal ederse kart ücreti otomatik iade edilmez, PayTR panelinden iade gerekir.

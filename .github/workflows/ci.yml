@@ -24,3 +24,11 @@ jobs:
       - name: Testleri calistir
         # Testler gecici SQLite kullanir, PostgreSQL gerekmez (bkz. tests/conftest.py)
         run: python -m pytest -q
+
+  yayin-kurulumu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker kurulumunu uctan uca dene
+        run: bash deploy/duman_testi.sh

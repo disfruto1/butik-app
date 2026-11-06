@@ -1,0 +1,72 @@
+# Yayin kurulumu: internet -> (Cloudflare) -> Caddy (HTTPS) -> uygulama -> PostgreSQL
+# Yalnizca Caddy disariya acilir. Adim adim anlatim: deploy/YAYIN.md
+name: butik
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: butik_db
+      POSTGRES_USER: butik
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?deploy/.env icinde POSTGRES_PASSWORD eksik}
+    volumes:
+      - db_verisi:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U butik -d butik_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - ic
+
+  app:
+    build: ../backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://butik:${POSTGRES_PASSWORD}@db:5432/butik_db
+      # X-Forwarded-For yalnizca Caddy'den gelirse dikkate alinir
+      FORWARDED_ALLOW_IPS: 172.30.0.10
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks:
+      - ic
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ALAN_ADI: ${ALAN_ADI:?deploy/.env icinde ALAN_ADI eksik}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_veri:/data
+      - caddy_ayar:/config
+    networks:
+      ic:
+        ipv4_address: 172.30.0.10
+
+networks:
+  ic:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  db_verisi:
+  caddy_veri:
+  caddy_ayar:

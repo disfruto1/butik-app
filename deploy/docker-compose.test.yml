@@ -1,0 +1,5 @@
+# Yalnizca deploy/duman_testi.sh icin. Test makinesinden gelen istekler Cloudflare'den geliyormus gibi sayilir.
+services:
+  caddy:
+    environment:
+      GUVENILIR_PROXYLER: 172.30.0.1/32
