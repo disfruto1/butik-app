@@ -9,6 +9,8 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 
+import certifi
+
 log = logging.getLogger("butik.eposta")
 
 
@@ -31,7 +33,8 @@ def gonder(alici: str, konu: str, metin: str) -> bool:
     port = int(os.getenv("SMTP_PORT", "587"))
     kullanici = os.getenv("SMTP_KULLANICI", "").strip()
     sifre = os.getenv("SMTP_SIFRE", "")
-    baglam = ssl.create_default_context()
+    # certifi: python.org kurulumu macOS'ta sistem sertifikalarini gormez, TLS dogrulamasi basarisiz olur
+    baglam = ssl.create_default_context(cafile=certifi.where())
     try:
         if port == 465:
             sunucu = smtplib.SMTP_SSL(host, port, timeout=15, context=baglam)
