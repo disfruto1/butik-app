@@ -85,9 +85,11 @@ case "$kod" in
 esac
 
 echo "== PostgreSQL'e kayit ve giris"
+surum=$(curl -4 -sk --resolve localhost:443:127.0.0.1 https://localhost/yasal/kayit | jq -r .surum)
 kod=$(curl -4 -sk -o /dev/null -w '%{http_code}' --resolve localhost:443:127.0.0.1 \
   -H 'Content-Type: application/json' \
-  -d '{"ad":"Duman Testi","e_posta":"duman@yulamoda.com","sifre":"duman-sifre-123"}' https://localhost/kayit)
+  -d "{\"ad\":\"Duman Testi\",\"e_posta\":\"duman@yulamoda.com\",\"sifre\":\"duman-sifre-123\",\"aydinlatma_okundu\":true,\"metin_surumu\":\"$surum\"}" \
+  https://localhost/kayit)
 [ "$kod" = 200 ] || basarisiz "kayit olmadi (kod $kod)"
 kod=$(curl -4 -sk -o /dev/null -w '%{http_code}' --resolve localhost:443:127.0.0.1 \
   -d 'username=duman@yulamoda.com&password=duman-sifre-123' https://localhost/giris)

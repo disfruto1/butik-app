@@ -9,6 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 import requests
 
+from conftest import kayit_ol
+
 import giris_siniri
 import main
 import models
@@ -343,7 +345,7 @@ def test_ikinci_odeme_incelemeye_duser(client, yonetici, musteri, paytr_istegi):
 
 
 def test_odeme_durumu_ve_sorunlar_yetki_ister(client, yonetici, musteri, paytr_istegi):
-    client.post("/kayit", json={"ad": "Baska", "e_posta": "baska@example.com", "sifre": "sifre123"})
+    kayit_ol(client, "Baska", "baska@example.com")
     baska = {"Authorization": "Bearer " + client.post("/giris", data={"username": "baska@example.com", "password": "sifre123"}).json()["access_token"]}
     sid, _ = siparis_ac(client, yonetici, musteri)
     oid = odeme_baslat(client, musteri, sid)

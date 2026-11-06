@@ -33,6 +33,7 @@ import eposta
 import giris_siniri
 import paytr
 import sifre_sifirlama
+import yasal_metinler
 
 models.Base.metadata.create_all(bind=engine)
 kolonlari_tamamla(engine)
@@ -119,16 +120,42 @@ def ayarlar():
     return {"odeme_bilgisi": os.getenv("ODEME_BILGISI", ""), "kart_odeme": paytr.ayarlar() is not None}
 
 
+@app.get("/yasal/kayit", tags=["Genel"])
+def yasal_kayit_metinleri():
+    """Uyelik ekraninda gosterilen metinler ve kayit sirasinda geri gonderilecek surum."""
+    return {
+        "aydinlatma": yasal_metinler.AYDINLATMA,
+        "eposta_izni": yasal_metinler.EPOSTA_IZNI,
+        "sms_izni": yasal_metinler.SMS_IZNI,
+        "izin_notu": yasal_metinler.IZIN_NOTU,
+        "surum": yasal_metinler.SURUM,
+    }
+
+
 # ----------------------------------------------------------------- Auth
 
 @app.post("/kayit", response_model=KullaniciCevap, tags=["Auth"])
-def kullanici_kayit(veri: KullaniciOlustur, db: Session = Depends(get_db)):
+def kullanici_kayit(veri: KullaniciOlustur, request: Request, db: Session = Depends(get_db)):
+    if not veri.aydinlatma_okundu:
+        raise HTTPException(status_code=400, detail="Uyelik icin KVKK Aydinlatma Metni okunmalidir")
+    if veri.metin_surumu != yasal_metinler.SURUM:
+        # Musteri eski metni gormus olabilir; yeni metin gosterilmeden onay kaydedilmez
+        raise HTTPException(status_code=409, detail="Metinler guncellendi, lutfen yeniden okuyun")
+    telefon = veri.telefon.strip() if veri.telefon else None
+    if veri.sms_izni and not telefon:
+        raise HTTPException(status_code=400, detail="SMS izni icin telefon numarasi gerekli")
     e_posta = veri.e_posta.strip().lower()
     mevcut = db.query(Kullanici).filter(func.lower(Kullanici.e_posta) == e_posta).first()
     if mevcut:
         raise HTTPException(status_code=400, detail="Bu e-posta zaten kayitli")
-    yeni = Kullanici(ad=veri.ad.strip(), e_posta=e_posta, sifre_hash=sifreyi_hashle(veri.sifre))
+    yeni = Kullanici(ad=veri.ad.strip(), e_posta=e_posta, sifre_hash=sifreyi_hashle(veri.sifre), telefon=telefon)
     db.add(yeni)
+    db.flush()  # onaylar hesapla ayni islemde yazilir: onaysiz hesap olusamaz
+    db.add_all(
+        yasal_metinler.kayit_onaylarini_olustur(
+            yeni.id, e_posta, telefon, veri.eposta_izni, veri.sms_izni, request.client.host if request.client else "bilinmiyor"
+        )
+    )
     db.commit()
     db.refresh(yeni)
     return yeni

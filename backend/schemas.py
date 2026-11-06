@@ -8,6 +8,11 @@ class KullaniciOlustur(BaseModel):
     ad: str = Field(min_length=1, max_length=120)
     e_posta: EmailStr
     sifre: str = Field(min_length=6, max_length=72)  # bcrypt en fazla 72 bayt isler
+    aydinlatma_okundu: bool = False
+    metin_surumu: str = Field(default="", max_length=16)  # /yasal/kayit'tan alinan, musterinin gordugu metnin surumu
+    eposta_izni: bool = False
+    sms_izni: bool = False
+    telefon: Optional[str] = Field(default=None, pattern=r"^\+?[0-9][0-9 ()-]{9,19}$")  # SMS izni icin zorunlu
 
 
 class SifirlamaIstek(BaseModel):
